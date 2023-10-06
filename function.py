@@ -15,7 +15,7 @@ def prediction(stock, n_days,selected_option):
     df.reset_index(inplace=True)
     
     if df.empty:
-        st.write("No data available for the selected stock.")
+        st.error("No data available for the selected stock.")
         return
     
     # Normalize data using MinMaxScaler
@@ -59,16 +59,41 @@ def prediction(stock, n_days,selected_option):
     
     st.plotly_chart(fig)
 
-def plot_stock_history(stock,d):
-    print(d)
-    df = yf.download(stock, period=d)
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name='Close Price'))
-    fig.update_layout(title=f"Stock Price History for {stock}", xaxis_title="Date", yaxis_title="Close Price")
+def plot_stock_history(stock, d,date1,date2):
+    today = datetime.today().date()
+    if date1>=today or date2>=today:
+        st.error("Start and end dates cannot be today's date or future dates.")
+        return
+
+    stock1 = yf.Ticker(stock)
+    df = stock1.history(period=d)
+
+    if df.empty:
+        st.error("No data available for the selected stock.")
+        return
+    # Create a Candlestick trace with dates as x-axis
+    candlestick = go.Candlestick(x=df.index, low=df['Low'], high=df['High'], close=df['Close'], open=df['Open'])
+
+    # Create a Figure with the Candlestick trace
+    fig = go.Figure(data=[candlestick])
+
+    # Update the layout to include title and axis labels
+    fig.update_layout(title=f"Stock Price History for {stock}", xaxis_title="Date", yaxis_title="Price")
+
+    # Show the Plotly chart in Streamlit
     st.plotly_chart(fig)
 
 def calculate_and_display_evm(stock):
+    if stock=="":
+        st.error("provide stock symbol")
+        return
+
     df = yf.download(stock, period='60d')
+
+    if df.empty:
+        st.error("No data available for the selected stock.")
+        return
+
     df.index = pd.to_datetime(df.index)  # Convert index to datetime format
     df['EVM'] = (df['High'] + df['Low'] + df['Close']) / 3
     df['Volatility'] = df['High'] - df['Low']
@@ -82,6 +107,7 @@ def calculate_and_display_evm(stock):
     
     # Create and display the graph
     fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name='Stock'))
     fig.add_trace(go.Scatter(x=df.index, y=df['EVM'], mode='lines', name='EVM'))
     fig.add_trace(go.Scatter(x=df.index, y=df['Bollinger_Upper'], mode='lines', name='Bollinger Upper'))
     fig.add_trace(go.Scatter(x=df.index, y=df['Bollinger_Lower'], mode='lines', name='Bollinger Lower'))
@@ -97,9 +123,14 @@ def compare_stocks(s1,s2,s,e):
     if s >= e:
         st.error("Start date should be before the end date.")
         return
+        
     stock_data1 = yf.download(s1, start=s, end=e)
     stock_data2 = yf.download(s2, start=s, end=e)
-    
+
+    if stock_data1.empty or stock_data2.empty:
+        st.error("No data available for the selected stock.")
+        return
+
     # Create and display the comparison graph
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=stock_data1.index, y=stock_data1['Close'], mode='lines', name=s1))
